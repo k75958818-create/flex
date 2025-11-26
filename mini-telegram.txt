@@ -1,0 +1,4 @@
+mini-telegram/
+├─ index.html
+├─ style.css
+└─ main.js

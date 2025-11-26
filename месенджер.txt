@@ -1,0 +1,123 @@
+// ===================
+// Mini Telegram v1
+// ===================
+
+const express = require('express');
+const http = require('http');
+const WebSocket = require('ws');
+const path = require('path');
+const fs = require('fs');
+
+const app = express();
+const server = http.createServer(app);
+const wss = new WebSocket.Server({ server });
+
+let users = {}; // { userId: ws }
+
+// ============ WebSocket ============
+wss.on('connection', (ws) => {
+    ws.on('message', (message) => {
+        const data = JSON.parse(message);
+        if(data.type === 'register') {
+            users[data.userId] = ws;
+        }
+        if(data.type === 'message') {
+            const targetWs = users[data.to];
+            if(targetWs) targetWs.send(JSON.stringify({ type:'message', from:data.from, text:data.text }));
+        }
+        if(data.type === 'signal') {
+            const targetWs = users[data.to];
+            if(targetWs) targetWs.send(JSON.stringify({ type:'signal', from:data.from, signal:data.signal }));
+        }
+        if(data.type === 'call') {
+            const targetWs = users[data.to];
+            if(targetWs) targetWs.send(JSON.stringify({ type:'call', from:data.from }));
+        }
+    });
+
+    ws.on('close', () => {
+        for(let id in users) if(users[id] === ws) delete users[id];
+    });
+});
+
+// ============ Frontend ============
+app.get('/', (req,res) => {
+    res.send(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mini Telegram</title>
+<script src="https://cdn.jsdelivr.net/npm/simple-peer@9/simplepeer.min.js"></script>
+<style>
+body { font-family: Helvetica, sans-serif; background:#f0f0f0; padding:20px; }
+.container { max-width: 500px; margin:auto; background:white; padding:15px; border-radius:8px; box-shadow:0 0 10px rgba(0,0,0,0.1); }
+input, button { padding:6px; margin:4px; border-radius:4px; border:1px solid #ccc; }
+button { cursor:pointer; }
+video { width:48%; border:1px solid #ccc; margin-top:8px; border-radius:4px; }
+#chat { border:1px solid #ccc; height:200px; overflow-y:scroll; padding:4px; background:#fafafa; margin-top:8px; border-radius:4px; }
+</style>
+</head>
+<body>
+<div class="container">
+<h2>Mini Telegram</h2>
+<div>
+<input id="userid" placeholder="Your ID"><button onclick="register()">Register</button>
+</div>
+<div>
+<input id="toid" placeholder="Send to"><input id="msg" placeholder="Message"><button onclick="sendMessage()">Send</button>
+</div>
+<button onclick="startCall()">Call</button>
+<div id="chat"></div>
+<video id="localVideo" autoplay muted></video>
+<video id="remoteVideo" autoplay></video>
+</div>
+
+<script>
+const ws = new WebSocket('ws://' + location.host);
+let userId='';
+let peer;
+
+ws.onmessage = (msg) => {
+    const data = JSON.parse(msg.data);
+    if(data.type==='message') appendMessage(data.from+': '+data.text);
+    if(data.type==='call') startCall(data.from,true);
+    if(data.type==='signal' && peer) peer.signal(data.signal);
+}
+
+function register() {
+    userId = document.getElementById('userid').value;
+    ws.send(JSON.stringify({type:'register', userId}));
+    appendMessage('Registered as '+userId);
+}
+
+function appendMessage(text) {
+    const div = document.createElement('div'); div.textContent=text;
+    document.getElementById('chat').appendChild(div);
+}
+
+function sendMessage() {
+    const to = document.getElementById('toid').value;
+    const text = document.getElementById('msg').value;
+    ws.send(JSON.stringify({type:'message', from:userId, to, text}));
+    appendMessage('Me: '+text);
+    document.getElementById('msg').value='';
+}
+
+function startCall(targetId,incoming=false) {
+    navigator.mediaDevices.getUserMedia({video:true,audio:true}).then(stream=>{
+        document.getElementById('localVideo').srcObject=stream;
+        peer = new SimplePeer({initiator:!incoming, trickle:false, stream});
+        peer.on('signal', data => ws.send(JSON.stringify({type:'signal', from:userId, to: incoming ? targetId : document.getElementById('toid').value, signal:data})));
+        peer.on('stream', remoteStream => document.getElementById('remoteVideo').srcObject = remoteStream);
+    });
+}
+</script>
+</body>
+</html>
+    `);
+});
+
+// ============ Server ============
+server.listen(3000, () => console.log('Mini Telegram running on http://localhost:3000'));

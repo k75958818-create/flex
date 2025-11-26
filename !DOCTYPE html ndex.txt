@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mini Telegram</title>
+<link href="style.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/simple-peer@9/simplepeer.min.js"></script>
+</head>
+<body>
+<div class="container">
+<h2>Mini Telegram</h2>
+
+<div class="row">
+<input id="userid" placeholder="Your ID">
+<button onclick="register()">Register</button>
+</div>
+
+<div class="row">
+<input id="toid" placeholder="Send to">
+<input id="msg" placeholder="Message">
+<button onclick="sendMessage()">Send</button>
+</div>
+
+<button onclick="startCall()">Call</button>
+
+<div id="chat"></div>
+
+<div class="videos">
+<video id="localVideo" autoplay muted></video>
+<video id="remoteVideo" autoplay></video>
+</div>
+</div>
+
+<script src="main.js"></script>
+</body>
+</html>

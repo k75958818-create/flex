@@ -1,0 +1,38 @@
+const ws = new WebSocket('ws://localhost:3000'); // тут можно заменить на онлайн сервер
+let userId='';
+let peer;
+
+ws.onmessage = (msg) => {
+    const data = JSON.parse(msg.data);
+    if(data.type==='message') appendMessage(data.from+': '+data.text);
+    if(data.type==='call') startCall(data.from,true);
+    if(data.type==='signal' && peer) peer.signal(data.signal);
+}
+
+function register() {
+    userId = document.getElementById('userid').value;
+    ws.send(JSON.stringify({type:'register', userId}));
+    appendMessage('Registered as '+userId);
+}
+
+function appendMessage(text) {
+    const div = document.createElement('div'); div.textContent=text;
+    document.getElementById('chat').appendChild(div);
+}
+
+function sendMessage() {
+    const to = document.getElementById('toid').value;
+    const text = document.getElementById('msg').value;
+    ws.send(JSON.stringify({type:'message', from:userId, to, text}));
+    appendMessage('Me: '+text);
+    document.getElementById('msg').value='';
+}
+
+function startCall(targetId,incoming=false) {
+    navigator.mediaDevices.getUserMedia({video:true,audio:true}).then(stream=>{
+        document.getElementById('localVideo').srcObject=stream;
+        peer = new SimplePeer({initiator:!incoming, trickle:false, stream});
+        peer.on('signal', data => ws.send(JSON.stringify({type:'signal', from:userId, to: incoming ? targetId : document.getElementById('toid').value, signal:data})));
+        peer.on('stream', remoteStream => document.getElementById('remoteVideo').srcObject = remoteStream);
+    });
+}
